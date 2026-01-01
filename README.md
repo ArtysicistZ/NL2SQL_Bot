@@ -30,12 +30,12 @@ pip install -r requirements.txt
 
 3) Run the web UI from the repo root:
 ```
-D:\Anaconda3\envs\veadk312\python.exe -m google.adk.cli web .
+google.adk.cli web .
 ```
 
 If port 8000 is busy:
 ```
-D:\Anaconda3\envs\veadk312\python.exe -m google.adk.cli web . --port 8010
+google.adk.cli web . --port 8010
 ```
 
 ## Configuration
