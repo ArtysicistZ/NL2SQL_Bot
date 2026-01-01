@@ -1,0 +1,12 @@
+from google.adk.agents import Agent
+
+from ..utils import load_prompt
+from .model_provider import get_model
+
+
+sql_generator_agent = Agent(
+    name="sql_generator_agent",
+    model=get_model(),
+    description="Generates read-only SQL for a single target table.",
+    instruction=load_prompt("sql_generator_agent"),
+)
