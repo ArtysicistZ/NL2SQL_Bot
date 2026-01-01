@@ -30,12 +30,12 @@ pip install -r requirements.txt
 
 3) Run the web UI from the repo root:
 ```
-google.adk.cli web .
+python -m google.adk.cli web .
 ```
 
 If port 8000 is busy:
 ```
-google.adk.cli web . --port 8010
+python -m google.adk.cli web . --port 8010
 ```
 
 ## Configuration
