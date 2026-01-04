@@ -1,5 +1,6 @@
 from google.adk.agents import Agent
 
+from ..tools.answer_tools import save_answer
 from ..utils import load_prompt
 from .model_provider import get_model
 
@@ -9,4 +10,5 @@ result_interpreter_agent = Agent(
     model=get_model(),
     description="Interprets raw SQL results and answers the user.",
     instruction=load_prompt("result_interpreter_agent"),
+    tools=[save_answer],
 )

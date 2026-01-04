@@ -32,6 +32,7 @@ class AppConfig:
     supabase_key: Optional[str]
     supabase_service_key: Optional[str]
     db_connection_string: Optional[str]
+    db_type: str
     db_schema: str
     allowed_tables: List[str]
     max_rows: int
@@ -64,6 +65,7 @@ def load_config() -> AppConfig:
         supabase_key=os.getenv("SUPABASE_KEY"),
         supabase_service_key=os.getenv("SUPABASE_SERVICE_KEY"),
         db_connection_string=os.getenv("POSTGRES_CONNECTION_STRING"),
+        db_type=os.getenv("DB_TYPE", "postgres").strip().lower(),
         db_schema=os.getenv("DB_SCHEMA", "public"),
         allowed_tables=allowed_tables,
         max_rows=max_rows,

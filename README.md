@@ -50,6 +50,7 @@ Required:
 - `TARGET_TABLE`
 
 Optional:
+- `DB_TYPE` (postgres/mysql/sqlite; default: postgres)
 - `MAX_ROWS` (default: 200)
 
 ## Project Structure

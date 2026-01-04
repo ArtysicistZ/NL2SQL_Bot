@@ -8,6 +8,7 @@ from google.adk.tools.tool_context import ToolContext
 from ..agents.sql_generator_agent import sql_generator_agent
 from ..config import load_config
 from ..database import get_supabase_client
+from ..utils.sql_dialect import get_sql_dialect_rules, normalize_db_type
 
 
 def _normalize_sql(sql: str) -> str:
@@ -15,6 +16,23 @@ def _normalize_sql(sql: str) -> str:
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`").strip()
     return cleaned
+
+
+def _strip_identifier(part: str) -> str:
+    token = part.strip()
+    if token.startswith("[") and token.endswith("]") and len(token) > 1:
+        token = token[1:-1]
+    if token.startswith("`") and token.endswith("`") and len(token) > 1:
+        token = token[1:-1]
+    if token.startswith('"') and token.endswith('"') and len(token) > 1:
+        token = token[1:-1]
+    return token
+
+
+def _normalize_identifier(identifier: str) -> str:
+    parts = [p for p in identifier.split(".") if p]
+    cleaned_parts = [_strip_identifier(part) for part in parts]
+    return ".".join(cleaned_parts)
 
 
 def _ensure_single_statement(sql: str) -> bool:
@@ -59,14 +77,14 @@ def _parse_sql_select(sql: str) -> Dict[str, object]:
         return {"success": False, "error": "Only simple SELECT queries (no JOIN/UNION/GROUP BY) are supported."}
 
     match = re.match(
-        r"(?is)^select\s+(?P<select>.+?)\s+from\s+(?P<table>[a-zA-Z0-9_.\"]+)(?P<rest>.*)$",
+        r"(?is)^select\s+(?P<select>.+?)\s+from\s+(?P<table>[a-zA-Z0-9_.\"`\[\]]+)(?P<rest>.*)$",
         cleaned,
     )
     if not match:
         return {"success": False, "error": "Unsupported SQL. Use SELECT ... FROM <table>."}
 
     select_clause = match.group("select").strip()
-    table = match.group("table").strip().strip('"')
+    table = _normalize_identifier(match.group("table").strip())
     rest = match.group("rest") or ""
 
     if re.search(r"\s", table):
@@ -93,7 +111,17 @@ def _parse_sql_select(sql: str) -> Dict[str, object]:
     if select_clause == "*":
         columns = ["*"]
     else:
-        columns = [col.strip().strip('"') for col in select_clause.split(",") if col.strip()]
+        columns = []
+        for col in select_clause.split(","):
+            col = col.strip()
+            if not col:
+                continue
+            if re.search(r"\s", col):
+                return {
+                    "success": False,
+                    "error": "Column aliases or expressions are not supported.",
+                }
+            columns.append(_normalize_identifier(col))
         if not columns:
             return {"success": False, "error": "No columns selected."}
 
@@ -103,7 +131,7 @@ def _parse_sql_select(sql: str) -> Dict[str, object]:
         for condition in conditions:
             condition = condition.strip()
             cond_match = re.match(
-                r"(?is)^([a-zA-Z0-9_.\"]+)\s*(=|!=|<>|>=|<=|>|<|ilike|like)\s*(.+)$",
+                r"(?is)^([a-zA-Z0-9_.\"`\[\]]+)\s*(=|!=|<>|>=|<=|>|<|ilike|like)\s*(.+)$",
                 condition,
             )
             if not cond_match:
@@ -111,7 +139,7 @@ def _parse_sql_select(sql: str) -> Dict[str, object]:
                     "success": False,
                     "error": "Unsupported WHERE clause. Use simple ANDed comparisons.",
                 }
-            column = cond_match.group(1).strip().strip('"')
+            column = _normalize_identifier(cond_match.group(1).strip())
             operator = cond_match.group(2).lower()
             value = _parse_sql_value(cond_match.group(3))
             filters.append((column, operator, value))
@@ -152,7 +180,7 @@ def _apply_order(query, order_by: str):
         return query
     first = order_by.split(",")[0].strip()
     parts = first.split()
-    column = parts[0].strip('"')
+    column = _normalize_identifier(parts[0])
     desc = len(parts) > 1 and parts[1].lower() == "desc"
     return query.order(column, desc=desc)
 
@@ -164,11 +192,17 @@ async def generate_sql(
     tool_context: ToolContext,
 ) -> Dict[str, object]:
     """Call SQLGeneratorAgent and wrap its SQL output as JSON."""
+    config = load_config()
+    db_type = normalize_db_type(config.db_type)
+    dialect_rules = get_sql_dialect_rules(db_type)
     prompt = (
         f"User question: {question}\n"
         f"Target table: {table}\n"
         "Columns:\n"
         + "\n".join([f"- {col['name']} ({col.get('type', '')})" for col in columns])
+        + f"\nDatabase type: {db_type}\n"
+        "Dialect rules:\n"
+        f"{dialect_rules}\n"
     )
     try:
         sql_text = await sql_generator_agent.run(prompt)
@@ -248,4 +282,6 @@ def run_sql(query: str, tool_context: ToolContext) -> Dict[str, object]:
     }
     tool_context.state["generated_sql"] = sql
     tool_context.state["sql_result"] = payload
+    tool_context.state["last_error"] = None
+    tool_context.state["sql_run_success"] = True
     return payload

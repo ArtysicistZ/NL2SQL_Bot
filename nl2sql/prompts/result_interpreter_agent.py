@@ -6,5 +6,7 @@ PROMPT = (
     "- Query result (columns + rows + row_count)\n\n"
     "Provide a clear, concise answer. If rows are empty, explain and suggest "
     "how to refine the query. If useful, compute simple aggregates manually "
-    "from the rows."
+    "from the rows.\n\n"
+    "Then always call save_answer with the final answer text, then return an empty string "
+    "and nothing else. Do not return the answer text directly."
 )

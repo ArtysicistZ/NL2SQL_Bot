@@ -14,4 +14,7 @@ PROMPT = (
     "- WHERE clause must be simple ANDed comparisons.\n"
     "- Avoid table aliases and SQL functions.\n"
     "- Always include a LIMIT clause.\n"
+    "- If the user asks for aggregation or distribution, return raw rows for the "
+    "relevant columns instead of using GROUP BY or aggregate functions.\n"
+    "- Follow any dialect rules provided by the parent.\n"
 )
