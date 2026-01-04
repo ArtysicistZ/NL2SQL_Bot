@@ -13,9 +13,9 @@ turns raw rows into a user answer.
 - output_agent: reads answer + plot_config from state and returns final JSON.
 
 ## Tools
-- inspect_table_schema: fetches one row via Supabase and infers column names.
+- inspect_table_schema: queries `information_schema.columns` for all allowed tables.
 - generate_sql: wraps sql_generator_agent output into JSON.
-- run_sql: validates and executes simple SELECT queries via Supabase.
+- run_sql: validates and executes read-only SQL via MySQL.
 - get_sql_result: exposes the latest SQL result to the plot_config_agent.
 - save_plot_config/get_plot_config: persist and read plot_config from state.
 - save_answer/get_answer: persist and read the final answer text from state.
@@ -47,7 +47,5 @@ Keys used by tools and agents:
 - last_error
 
 ## Security Boundaries
-- Allowed tables only (from ALLOWED_TABLES / TARGET_TABLE)
-- SELECT-only, single statement
-- No JOIN/UNION/GROUP BY/HAVING
-- Max rows enforced (MAX_ROWS)
+- Allowed tables only (from ALLOWED_TABLES / TARGET_TABLE) for schema inspection
+- Read-only SQL validation

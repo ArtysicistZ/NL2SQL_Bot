@@ -1,15 +1,77 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Tuple
+from typing import Dict
 
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
 
 from ..agents.sql_generator_agent import sql_generator_agent
 from ..config import load_config
-from ..database import get_supabase_client
+from ..database import get_mysql_connection
 from ..utils.sql_dialect import get_sql_dialect_rules, normalize_db_type
+
+
+DANGEROUS_SQL_PATTERNS = [
+    r"\bDELETE\b",
+    r"\bINSERT\b",
+    r"\bUPDATE\b",
+    r"\bDROP\b",
+    r"\bTRUNCATE\b",
+    r"\bALTER\b",
+    r"\bCREATE\b",
+    r"\bGRANT\b",
+    r"\bREVOKE\b",
+    r"\bEXEC\b",
+    r"\bEXECUTE\b",
+    r"\bCALL\b",
+    r"\bRENAME\b",
+    r"\bREPLACE\b",
+    r"\bMERGE\b",
+    r"\bLOAD\b",
+    r"\bINTO\s+OUTFILE\b",
+    r"\bINTO\s+DUMPFILE\b",
+]
+
+
+def validate_sql_is_readonly(sql: str) -> bool:
+    """
+    Args:
+        sql: The SQL statement to validate
+
+    Returns:
+        True if SQL is safe (read-only), False otherwise
+    """
+    if not sql or not sql.strip():
+        return False
+
+    sql_upper = sql.upper().strip()
+
+    # Remove comments that might be used to hide malicious code
+    # Remove single-line comments (-- and #)
+    sql_upper = re.sub(r"--.*$", "", sql_upper, flags=re.MULTILINE)
+    sql_upper = re.sub(r"#.*$", "", sql_upper, flags=re.MULTILINE)
+    sql_upper = re.sub(r"/\*.*?\*/", "", sql_upper, flags=re.DOTALL)
+    sql_upper = sql_upper.strip()
+
+    if not re.match(r"^(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN)\b", sql_upper):
+        return False
+
+    for pattern in DANGEROUS_SQL_PATTERNS:
+        if re.search(pattern, sql_upper, re.IGNORECASE):
+            return False
+
+    # Check for multiple statements (semicolon followed by another statement)
+    # This prevents SQL injection like: SELECT * FROM x; DELETE FROM y
+    statements = [s.strip() for s in sql_upper.split(";") if s.strip()]
+    if len(statements) > 1:
+        for stmt in statements[1:]:
+            if stmt and not re.match(
+                r"^(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN)\b", stmt
+            ):
+                return False
+
+    return True
 
 
 def _normalize_sql(sql: str) -> str:
@@ -17,173 +79,6 @@ def _normalize_sql(sql: str) -> str:
     if cleaned.startswith("```"):
         cleaned = cleaned.strip("`").strip()
     return cleaned
-
-
-def _strip_identifier(part: str) -> str:
-    token = part.strip()
-    if token.startswith("[") and token.endswith("]") and len(token) > 1:
-        token = token[1:-1]
-    if token.startswith("`") and token.endswith("`") and len(token) > 1:
-        token = token[1:-1]
-    if token.startswith('"') and token.endswith('"') and len(token) > 1:
-        token = token[1:-1]
-    return token
-
-
-def _normalize_identifier(identifier: str) -> str:
-    parts = [p for p in identifier.split(".") if p]
-    cleaned_parts = [_strip_identifier(part) for part in parts]
-    return ".".join(cleaned_parts)
-
-
-def _ensure_single_statement(sql: str) -> bool:
-    parts = [part.strip() for part in sql.split(";") if part.strip()]
-    return len(parts) == 1
-
-
-def _is_read_only(sql: str) -> bool:
-    normalized = re.sub(r"--.*?$", "", sql, flags=re.MULTILINE).strip()
-    if not normalized.lower().startswith(("select", "with")):
-        return False
-    forbidden = re.compile(
-        r"\b(insert|update|delete|drop|alter|create|truncate|grant|revoke)\b",
-        re.IGNORECASE,
-    )
-    return not forbidden.search(normalized)
-
-
-def _parse_sql_value(raw_value: str):
-    value = raw_value.strip()
-    if value.lower() in {"null", "none"}:
-        return None
-    if value.lower() in {"true", "false"}:
-        return value.lower() == "true"
-    if (value.startswith("'") and value.endswith("'")) or (
-        value.startswith('"') and value.endswith('"')
-    ):
-        value = value[1:-1]
-        value = value.replace("''", "'")
-        return value
-    try:
-        if "." in value:
-            return float(value)
-        return int(value)
-    except ValueError:
-        return value
-
-
-def _parse_sql_select(sql: str) -> Dict[str, object]:
-    cleaned = re.sub(r"\s+", " ", sql.strip().rstrip(";"))
-    if re.search(r"\bjoin\b|\bunion\b|\bgroup\b|\bhaving\b", cleaned, flags=re.IGNORECASE):
-        return {"success": False, "error": "Only simple SELECT queries (no JOIN/UNION/GROUP BY) are supported."}
-
-    match = re.match(
-        r"(?is)^select\s+(?P<select>.+?)\s+from\s+(?P<table>[a-zA-Z0-9_.\"`\[\]]+)(?P<rest>.*)$",
-        cleaned,
-    )
-    if not match:
-        return {"success": False, "error": "Unsupported SQL. Use SELECT ... FROM <table>."}
-
-    select_clause = match.group("select").strip()
-    table = _normalize_identifier(match.group("table").strip())
-    rest = match.group("rest") or ""
-
-    if re.search(r"\s", table):
-        return {"success": False, "error": "Table aliases are not supported. Use a single table name."}
-
-    limit = None
-    order_by = None
-    where_clause = ""
-
-    limit_match = re.search(r"(?is)\s+limit\s+(\d+)\s*$", rest)
-    if limit_match:
-        limit = int(limit_match.group(1))
-        rest = rest[: limit_match.start()]
-
-    order_match = re.search(r"(?is)\s+order\s+by\s+(.+)$", rest)
-    if order_match:
-        order_by = order_match.group(1).strip()
-        rest = rest[: order_match.start()]
-
-    where_match = re.search(r"(?is)\s+where\s+(.+)$", rest)
-    if where_match:
-        where_clause = where_match.group(1).strip()
-
-    if select_clause == "*":
-        columns = ["*"]
-    else:
-        columns = []
-        for col in select_clause.split(","):
-            col = col.strip()
-            if not col:
-                continue
-            if re.search(r"\s", col):
-                return {
-                    "success": False,
-                    "error": "Column aliases or expressions are not supported.",
-                }
-            columns.append(_normalize_identifier(col))
-        if not columns:
-            return {"success": False, "error": "No columns selected."}
-
-    filters: List[Tuple[str, str, object]] = []
-    if where_clause:
-        conditions = re.split(r"\s+and\s+", where_clause, flags=re.IGNORECASE)
-        for condition in conditions:
-            condition = condition.strip()
-            cond_match = re.match(
-                r"(?is)^([a-zA-Z0-9_.\"`\[\]]+)\s*(=|!=|<>|>=|<=|>|<|ilike|like)\s*(.+)$",
-                condition,
-            )
-            if not cond_match:
-                return {
-                    "success": False,
-                    "error": "Unsupported WHERE clause. Use simple ANDed comparisons.",
-                }
-            column = _normalize_identifier(cond_match.group(1).strip())
-            operator = cond_match.group(2).lower()
-            value = _parse_sql_value(cond_match.group(3))
-            filters.append((column, operator, value))
-
-    return {
-        "success": True,
-        "table": table,
-        "columns": columns,
-        "filters": filters,
-        "limit": limit,
-        "order_by": order_by,
-    }
-
-
-def _apply_filters(query, filters: List[Tuple[str, str, object]]):
-    for column, operator, value in filters:
-        if operator == "=":
-            query = query.eq(column, value)
-        elif operator in ("!=", "<>"):
-            query = query.neq(column, value)
-        elif operator == ">":
-            query = query.gt(column, value)
-        elif operator == ">=":
-            query = query.gte(column, value)
-        elif operator == "<":
-            query = query.lt(column, value)
-        elif operator == "<=":
-            query = query.lte(column, value)
-        elif operator == "ilike":
-            query = query.ilike(column, value)
-        elif operator == "like":
-            query = query.like(column, value)
-    return query
-
-
-def _apply_order(query, order_by: str):
-    if not order_by:
-        return query
-    first = order_by.split(",")[0].strip()
-    parts = first.split()
-    column = _normalize_identifier(parts[0])
-    desc = len(parts) > 1 and parts[1].lower() == "desc"
-    return query.order(column, desc=desc)
 
 
 _SQL_GENERATOR_TOOL = AgentTool(sql_generator_agent)
@@ -199,12 +94,17 @@ async def generate_sql(
     db_type = normalize_db_type(config.db_type)
     dialect_rules = get_sql_dialect_rules(db_type)
     if not table:
-        table = tool_context.state.get("selected_table", "")
-    if not table:
         tool_context.state["last_error"] = "Missing table for SQL generation."
         return {"success": False, "message": "Missing table for SQL generation."}
 
-    columns = tool_context.state.get("table_columns")
+    table_schemas = tool_context.state.get("table_schemas") or {}
+    columns = table_schemas.get(table)
+    if not columns and table_schemas:
+        lower_map = {name.lower(): name for name in table_schemas}
+        match = lower_map.get(table.lower())
+        if match:
+            table = match
+            columns = table_schemas[match]
     if not columns:
         tool_context.state["last_error"] = "Missing columns for SQL generation."
         return {"success": False, "message": "Missing columns for SQL generation."}
@@ -237,58 +137,27 @@ async def generate_sql(
 
 
 def run_sql(query: str, tool_context: ToolContext) -> Dict[str, object]:
-    """Execute SQL after validating it is read-only and within allowed tables."""
-    config = load_config()
+    """Execute SQL after validating it is read-only."""
     sql = _normalize_sql(query)
 
-    if not _ensure_single_statement(sql):
-        tool_context.state["last_error"] = "Multiple SQL statements are not allowed."
-        return {"status": "error", "error_message": "Multiple SQL statements are not allowed."}
-    if not _is_read_only(sql):
-        tool_context.state["last_error"] = "Only SELECT/CTE queries are allowed."
-        return {"status": "error", "error_message": "Only SELECT/CTE queries are allowed."}
+    if not validate_sql_is_readonly(sql):
+        tool_context.state["last_error"] = "Only read-only SQL queries are allowed."
+        return {"status": "error", "error_message": "Only read-only SQL queries are allowed."}
 
-    parsed = _parse_sql_select(sql)
-    if not parsed.get("success"):
-        tool_context.state["last_error"] = parsed.get("error", "Unsupported SQL.")
-        return {"status": "error", "error_message": parsed.get("error", "Unsupported SQL.")}
-
-    table = parsed["table"]
-    columns = parsed["columns"]
-    filters = parsed["filters"]
-    limit = parsed["limit"]
-    order_by = parsed["order_by"]
-
-    if columns == ["*"]:
-        tool_context.state["last_error"] = "SELECT * is not allowed."
-        return {"status": "error", "error_message": "SELECT * is not allowed."}
-
-    if config.allowed_tables:
-        allowed = {t.lower() for t in config.allowed_tables}
-        if table.lower() not in allowed:
-            tool_context.state["last_error"] = f"Table '{table}' is not allowed."
-            return {"status": "error", "error_message": f"Table '{table}' is not allowed."}
-
-    max_rows = config.max_rows
-    if limit is None or limit > max_rows:
-        limit = max_rows
-
-    client = get_supabase_client()
     try:
-        query_builder = client.table(table).select(",".join(columns))
-        query_builder = _apply_filters(query_builder, filters)
-        query_builder = _apply_order(query_builder, order_by)
-        response = query_builder.limit(limit).execute()
+        connection = get_mysql_connection()
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        rows_data = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description] if cursor.description else []
     except Exception as exc:
         tool_context.state["last_error"] = str(exc)
-        return {"status": "error", "error_message": "Supabase query failed."}
+        return {"status": "error", "error_message": "MySQL query failed."}
+    finally:
+        if "cursor" in locals():
+            cursor.close()
 
-    if getattr(response, "error", None):
-        tool_context.state["last_error"] = str(response.error)
-        return {"status": "error", "error_message": "Supabase query failed."}
-
-    data = response.data or []
-    rows = [[row.get(col) for col in columns] for row in data]
+    rows = [list(row) for row in rows_data]
 
     payload = {
         "status": "success",

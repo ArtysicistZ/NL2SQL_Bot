@@ -5,70 +5,61 @@ from typing import Dict, List
 from google.adk.tools.tool_context import ToolContext
 
 from ..config import load_config
-from ..database import get_supabase_client
+from ..database import get_mysql_connection
 
 
-def _infer_columns_from_row(row: Dict[str, object]) -> List[Dict[str, str]]:
-    columns = []
-    for key, value in row.items():
-        if value is None:
-            col_type = "unknown"
-        else:
-            col_type = type(value).__name__
-        columns.append({"name": key, "type": col_type})
-    return columns
-
-
-def inspect_table_schema(
-    table_name: str, tool_context: ToolContext
-) -> Dict[str, List[Dict[str, str]]]:
-    """Return column names and types for a target table."""
+def inspect_table_schema(tool_context: ToolContext) -> Dict[str, object]:
+    """Return column names and types for all allowed tables."""
     config = load_config()
-    default_table = config.allowed_tables[0] if config.allowed_tables else None
-    table = (table_name or default_table or "").strip()
-    if not table:
+    if not config.allowed_tables:
         return {
             "status": "error",
-            "error_message": "Missing table name. Provide a table or set TARGET_TABLE.",
+            "error_message": "Missing allowed tables. Set ALLOWED_TABLES or TARGET_TABLE.",
         }
 
-    if config.allowed_tables:
-        allowed = {t.lower() for t in config.allowed_tables}
-        if table.lower() not in allowed:
-            return {
-                "status": "error",
-                "error_message": f"Table '{table}' is not allowed.",
-            }
-
-    client = get_supabase_client()
     try:
-        response = client.table(table).select("*").limit(1).execute()
+        connection = get_mysql_connection()
+        cursor = connection.cursor()
+        table_schemas: Dict[str, List[Dict[str, str]]] = {}
+        missing_tables: List[str] = []
+        for table in config.allowed_tables:
+            cursor.execute(
+                (
+                    "SELECT COLUMN_NAME, DATA_TYPE "
+                    "FROM INFORMATION_SCHEMA.COLUMNS "
+                    "WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s "
+                    "ORDER BY ORDINAL_POSITION"
+                ),
+                (config.mysql_database, table),
+            )
+            rows = cursor.fetchall()
+            columns = [{"name": row[0], "type": row[1]} for row in rows]
+            if columns:
+                table_schemas[table] = columns
+            else:
+                missing_tables.append(table)
     except Exception as exc:
         return {
             "status": "error",
-            "error_message": f"Supabase query failed: {exc}",
+            "error_message": f"MySQL query failed: {exc}",
         }
+    finally:
+        if "cursor" in locals():
+            cursor.close()
 
-    if getattr(response, "error", None):
+    if not table_schemas:
         return {
             "status": "error",
-            "error_message": f"Supabase error: {response.error}",
+            "error_message": "No columns found for any allowed tables.",
         }
 
-    data = response.data or []
-    if data:
-        columns = _infer_columns_from_row(data[0])
-    else:
-        columns = []
-    if not columns:
-        return {
-            "status": "error",
-            "error_message": (
-                f"No rows found for table '{table}'. Add at least one row so the "
-                "schema can be inferred via Supabase."
-            ),
-        }
+    tool_context.state["table_schemas"] = table_schemas
+    tool_context.state["allowed_tables"] = list(config.allowed_tables)
 
-    tool_context.state["selected_table"] = table
-    tool_context.state["table_columns"] = columns
-    return {"status": "success", "table": table, "columns": columns}
+    response: Dict[str, object] = {
+        "status": "success",
+        "tables": table_schemas,
+    }
+    if missing_tables:
+        response["missing_tables"] = missing_tables
+    return response
