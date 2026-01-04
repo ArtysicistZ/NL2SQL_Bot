@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Tuple
 
+from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
 
 from ..agents.sql_generator_agent import sql_generator_agent
@@ -185,16 +186,29 @@ def _apply_order(query, order_by: str):
     return query.order(column, desc=desc)
 
 
+_SQL_GENERATOR_TOOL = AgentTool(sql_generator_agent)
+
+
 async def generate_sql(
     question: str,
     table: str,
-    columns: List[Dict[str, str]],
     tool_context: ToolContext,
 ) -> Dict[str, object]:
     """Call SQLGeneratorAgent and wrap its SQL output as JSON."""
     config = load_config()
     db_type = normalize_db_type(config.db_type)
     dialect_rules = get_sql_dialect_rules(db_type)
+    if not table:
+        table = tool_context.state.get("selected_table", "")
+    if not table:
+        tool_context.state["last_error"] = "Missing table for SQL generation."
+        return {"success": False, "message": "Missing table for SQL generation."}
+
+    columns = tool_context.state.get("table_columns")
+    if not columns:
+        tool_context.state["last_error"] = "Missing columns for SQL generation."
+        return {"success": False, "message": "Missing columns for SQL generation."}
+
     prompt = (
         f"User question: {question}\n"
         f"Target table: {table}\n"
@@ -205,7 +219,10 @@ async def generate_sql(
         f"{dialect_rules}\n"
     )
     try:
-        sql_text = await sql_generator_agent.run(prompt)
+        sql_text = await _SQL_GENERATOR_TOOL.run_async(
+            args={"request": prompt},
+            tool_context=tool_context,
+        )
     except Exception as exc:
         tool_context.state["last_error"] = str(exc)
         return {"success": False, "message": "SQL generator failed."}
