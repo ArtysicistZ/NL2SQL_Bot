@@ -28,10 +28,12 @@ class AppConfig:
     azure_endpoint: Optional[str]
     azure_api_version: str
     azure_deployment: Optional[str]
-    supabase_url: Optional[str]
-    supabase_key: Optional[str]
-    supabase_service_key: Optional[str]
-    db_connection_string: Optional[str]
+    mysql_host: Optional[str]
+    mysql_port: int
+    mysql_user: Optional[str]
+    mysql_password: Optional[str]
+    mysql_database: Optional[str]
+    db_type: str
     db_schema: str
     allowed_tables: List[str]
     max_rows: int
@@ -55,15 +57,23 @@ def load_config() -> AppConfig:
     except ValueError:
         max_rows = 200
 
+    mysql_port_raw = os.getenv("MYSQL_PORT", "3306").strip()
+    try:
+        mysql_port = int(mysql_port_raw)
+    except ValueError:
+        mysql_port = 3306
+
     return AppConfig(
         azure_api_key=os.getenv("AZURE_OPENAI_API_KEY"),
         azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         azure_api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview"),
         azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT") or os.getenv("MODEL"),
-        supabase_url=os.getenv("SUPABASE_URL"),
-        supabase_key=os.getenv("SUPABASE_KEY"),
-        supabase_service_key=os.getenv("SUPABASE_SERVICE_KEY"),
-        db_connection_string=os.getenv("POSTGRES_CONNECTION_STRING"),
+        mysql_host=os.getenv("MYSQL_HOST"),
+        mysql_port=mysql_port,
+        mysql_user=os.getenv("MYSQL_USER"),
+        mysql_password=os.getenv("MYSQL_PASSWORD"),
+        mysql_database=os.getenv("MYSQL_DATABASE"),
+        db_type=os.getenv("DB_TYPE", "mysql").strip().lower(),
         db_schema=os.getenv("DB_SCHEMA", "public"),
         allowed_tables=allowed_tables,
         max_rows=max_rows,
@@ -78,13 +88,19 @@ def require_azure_deployment(config: AppConfig) -> str:
     return config.azure_deployment
 
 
-def require_db_connection_string(config: AppConfig) -> str:
-    if not config.db_connection_string:
-        raise ValueError("Missing POSTGRES_CONNECTION_STRING in .env.")
-    return config.db_connection_string
-
-
-def require_supabase_config(config: AppConfig) -> tuple[str, str]:
-    if not config.supabase_url or not config.supabase_key:
-        raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY in .env.")
-    return config.supabase_url, (config.supabase_service_key or config.supabase_key)
+def require_mysql_config(config: AppConfig) -> tuple[str, int, str, str, str]:
+    if not config.mysql_host:
+        raise ValueError("Missing MYSQL_HOST in .env.")
+    if not config.mysql_user:
+        raise ValueError("Missing MYSQL_USER in .env.")
+    if not config.mysql_password:
+        raise ValueError("Missing MYSQL_PASSWORD in .env.")
+    if not config.mysql_database:
+        raise ValueError("Missing MYSQL_DATABASE in .env.")
+    return (
+        config.mysql_host,
+        config.mysql_port,
+        config.mysql_user,
+        config.mysql_password,
+        config.mysql_database,
+    )

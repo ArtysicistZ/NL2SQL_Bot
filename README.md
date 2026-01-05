@@ -1,22 +1,22 @@
 # ADK NL2SQL
 
-Lightweight NL2SQL bot built on Google ADK and Azure OpenAI. It uses Supabase
-HTTP APIs (not a raw Postgres connection) to read table data safely and then
-lets agents generate and interpret SQL.
+Lightweight NL2SQL bot built on Google ADK and Azure OpenAI. It connects to a
+local MySQL database to read table data and then lets agents generate and
+interpret SQL.
 
 ## Overview
 - Minimal workflow: schema -> SQL -> query -> answer
 - Read-only by design (SELECT only)
-- Table allowlist and row limit enforcement
-- Supabase HTTP client for reliable connectivity
+- Optional table allowlist for schema inspection
+- Direct MySQL connection
 
 ## How It Works
 ```
 User question
   -> root_agent routes to sql_task_agent
-  -> inspect_table_schema (Supabase, infer columns from one row)
+  -> inspect_table_schema (MySQL information_schema lookup)
   -> generate_sql (LLM tool, SQL only)
-  -> run_sql (Supabase query)
+  -> run_sql (MySQL query)
   -> result_interpreter_agent answers
 ```
 
@@ -44,12 +44,16 @@ Required:
 - `AZURE_OPENAI_ENDPOINT`
 - `AZURE_OPENAI_API_VERSION`
 - `AZURE_OPENAI_DEPLOYMENT` (or `MODEL`)
-- `SUPABASE_URL`
-- `SUPABASE_KEY` (or `SUPABASE_SERVICE_KEY`)
-- `ALLOWED_TABLES` (comma-separated)
+- `MYSQL_HOST`
+- `MYSQL_PORT`
+- `MYSQL_USER`
+- `MYSQL_PASSWORD`
+- `MYSQL_DATABASE`
 - `TARGET_TABLE`
 
 Optional:
+- `ALLOWED_TABLES` (comma-separated)
+- `DB_TYPE` (postgres/mysql/sqlite; default: mysql)
 - `MAX_ROWS` (default: 200)
 
 ## Project Structure
@@ -68,10 +72,8 @@ adk_nl2sql/
 ```
 
 ## Notes and Limits
-- Schema inference uses a single row via Supabase; empty tables cannot be
-  introspected.
-- SQL runner supports simple SELECT queries only (no JOIN/UNION/GROUP BY).
-- Always uses a table allowlist and row limit.
+- Schema inference uses `information_schema.columns`.
+- SQL runner only enforces a read-only safety check.
 
 ## Docs
 - `docs/ARCHITECTURE.md`
