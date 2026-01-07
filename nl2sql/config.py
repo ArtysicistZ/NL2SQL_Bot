@@ -24,10 +24,10 @@ _load_env()
 
 @dataclass(frozen=True)
 class AppConfig:
-    azure_api_key: Optional[str]
-    azure_endpoint: Optional[str]
-    azure_api_version: str
-    azure_deployment: Optional[str]
+    ai_api_key: Optional[str]
+    ai_endpoint: Optional[str]
+    ai_version: str
+    ai_model: Optional[str]
     mysql_host: Optional[str]
     mysql_port: int
     mysql_user: Optional[str]
@@ -64,10 +64,10 @@ def load_config() -> AppConfig:
         mysql_port = 3306
 
     return AppConfig(
-        azure_api_key=os.getenv("AZURE_OPENAI_API_KEY"),
-        azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
-        azure_api_version=os.getenv("AZURE_OPENAI_API_VERSION", "2025-01-01-preview"),
-        azure_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT") or os.getenv("MODEL"),
+        ai_api_key=os.getenv("AI_API_KEY"),
+        ai_endpoint=os.getenv("AI_ENDPOINT"),
+        ai_version=os.getenv("AI_API_VERSION", "2025-01-01-preview"),
+        ai_model=os.getenv("AI_MODEL"),
         mysql_host=os.getenv("MYSQL_HOST"),
         mysql_port=mysql_port,
         mysql_user=os.getenv("MYSQL_USER"),
@@ -80,12 +80,12 @@ def load_config() -> AppConfig:
     )
 
 
-def require_azure_deployment(config: AppConfig) -> str:
-    if not config.azure_deployment:
+def require_ai_model(config: AppConfig) -> str:
+    if not config.ai_model:
         raise ValueError(
-            "Missing AZURE_OPENAI_DEPLOYMENT (or MODEL) in .env for LiteLLM."
+            "Missing AI_MODEL in .env for LiteLLM."
         )
-    return config.azure_deployment
+    return config.ai_model
 
 
 def require_mysql_config(config: AppConfig) -> tuple[str, int, str, str, str]:
