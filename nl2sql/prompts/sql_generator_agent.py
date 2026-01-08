@@ -15,7 +15,6 @@ PROMPT = (
     "- If the user asks multiple independent questions, you must output multiple read-only statements separated by ';'.\n"
     "- Do not use SELECT *.\n"
     "- Wisely use GROUP BY and ORDER BY when necessary to answer the question.\n"
-    "- WHERE clause must be simple ANDed comparisons.\n"
     "- Avoid table aliases and SQL functions.\n"
     "- Always include a LIMIT clause (default: 100).\n"
     "- If the user asks for aggregation or distribution, return raw rows for the "
