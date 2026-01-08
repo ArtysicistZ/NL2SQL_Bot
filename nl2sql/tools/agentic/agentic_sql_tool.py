@@ -6,7 +6,7 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
 
 from ...agents.sql_task_agent import sql_task_agent
-from ..schema_tools import inspect_table_schema
+from ..sql.schema_tools import inspect_table_schema
 from .agentic_utils import (
     clear_downstream_state,
     format_table_schemas,
