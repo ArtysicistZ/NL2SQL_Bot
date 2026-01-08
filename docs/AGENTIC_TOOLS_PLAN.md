@@ -7,7 +7,7 @@
 
 ## Current Baseline
 - `root_agent` is a `SequentialAgent` that always runs:
-  `sql_task_agent -> plot_config_agent -> result_interpreter_agent -> output_agent`
+  `sql_task_agent -> plot_config_agent -> result_interpreter_agent`
 - State keys already in use:
   `table_schemas`, `allowed_tables`, `sql_result`, `plot_config`, `answer`, `generated_sql`, `last_error`
 
@@ -58,11 +58,11 @@ Create four tools that call their respective agents via `AgentTool` and manage s
    - Inputs: optional `refinement`
    - Reads: `answer`, `plot_config`, `sql_result`
    - Behavior:
-     - If any dependency missing, return `needs_retry` targeting the missing tool.
      - Build the final JSON directly from state (no agent call).
+     - If dependencies are missing, use safe defaults and record that in status.
    - Writes:
      - `final_response` (JSON payload)
-      - `output_status` (JSON status object)
+     - `output_status` (JSON status object)
 
 ### Standard Tool Status Schema
 Each wrapper tool returns and stores a consistent JSON result:

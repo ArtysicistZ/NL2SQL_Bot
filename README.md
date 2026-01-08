@@ -13,11 +13,11 @@ interpret SQL.
 ## How It Works
 ```
 User question
-  -> root_agent routes to sql_task_agent
-  -> inspect_table_schema (MySQL information_schema lookup)
-  -> generate_sql (LLM tool, SQL only)
-  -> run_sql (MySQL query)
-  -> result_interpreter_agent answers
+  -> root_agent orchestrates agentic tools
+  -> run_sql_task_agent_tool (schema -> SQL -> run)
+  -> run_plot_config_agent_tool (plot config)
+  -> run_result_interpreter_agent_tool (answer)
+  -> run_output_tool (final JSON)
 ```
 
 ## Quick Start

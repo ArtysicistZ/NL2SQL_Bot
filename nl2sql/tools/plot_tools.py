@@ -29,13 +29,31 @@ def get_sql_result(tool_context: ToolContext, max_rows: int = 20) -> Dict[str, o
     rows = result.get("rows") or []
     row_count = result.get("row_count", len(rows))
     sql = result.get("sql")
+    result_sets = result.get("result_sets") or []
+    if result_sets:
+        full_sets = []
+        for result_set in result_sets:
+            set_rows = result_set.get("rows") or []
+            full_sets.append(
+                {
+                    "sql": result_set.get("sql", ""),
+                    "columns": result_set.get("columns") or [],
+                    "rows": set_rows,
+                    "row_count": result_set.get("row_count", len(set_rows)),
+                }
+            )
+        result_sets = full_sets
+        primary = result_sets[0]
+        columns = primary.get("columns") or columns
+        rows = primary.get("rows") or rows
+        row_count = primary.get("row_count", len(rows))
 
     if max_rows is not None and max_rows >= 0:
         rows = rows[:max_rows]
 
     sampled = len(rows) < row_count
 
-    return {
+    payload = {
         "status": "success",
         "sql": sql,
         "columns": columns,
@@ -44,6 +62,9 @@ def get_sql_result(tool_context: ToolContext, max_rows: int = 20) -> Dict[str, o
         "sampled": sampled,
         "sample_size": len(rows),
     }
+    if result_sets:
+        payload["result_sets"] = result_sets
+    return payload
 
 
 def save_plot_config(plot_config: object, tool_context: ToolContext) -> Dict[str, object]:

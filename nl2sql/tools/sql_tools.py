@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Dict
 
+import sqlparse
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
 
@@ -45,31 +47,21 @@ def validate_sql_is_readonly(sql: str) -> bool:
     if not sql or not sql.strip():
         return False
 
-    sql_upper = sql.upper().strip()
-
-    # Remove comments that might be used to hide malicious code
-    # Remove single-line comments (-- and #)
-    sql_upper = re.sub(r"--.*$", "", sql_upper, flags=re.MULTILINE)
-    sql_upper = re.sub(r"#.*$", "", sql_upper, flags=re.MULTILINE)
-    sql_upper = re.sub(r"/\*.*?\*/", "", sql_upper, flags=re.DOTALL)
-    sql_upper = sql_upper.strip()
-
-    if not re.match(r"^(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN)\b", sql_upper):
+    cleaned = _strip_sql_comments(sql).strip()
+    if not cleaned:
         return False
 
     for pattern in DANGEROUS_SQL_PATTERNS:
-        if re.search(pattern, sql_upper, re.IGNORECASE):
+        if re.search(pattern, cleaned, re.IGNORECASE):
             return False
 
-    # Check for multiple statements (semicolon followed by another statement)
-    # This prevents SQL injection like: SELECT * FROM x; DELETE FROM y
-    statements = [s.strip() for s in sql_upper.split(";") if s.strip()]
-    if len(statements) > 1:
-        for stmt in statements[1:]:
-            if stmt and not re.match(
-                r"^(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN)\b", stmt
-            ):
-                return False
+    statements = _split_sql_statements(cleaned)
+    if not statements:
+        return False
+    for stmt in statements:
+        stmt_upper = stmt.strip().upper()
+        if not re.match(r"^(SELECT|WITH|SHOW|DESCRIBE|DESC|EXPLAIN)\b", stmt_upper):
+            return False
 
     return True
 
@@ -81,6 +73,24 @@ def _normalize_sql(sql: str) -> str:
     return cleaned
 
 
+def _coerce_text(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=True)
+    return str(value)
+
+
+def _split_sql_statements(sql: str) -> list[str]:
+    return [stmt.strip() for stmt in sqlparse.split(sql) if stmt.strip()]
+
+
+def _strip_sql_comments(sql: str) -> str:
+    return sqlparse.format(sql, strip_comments=True)
+
+
 _SQL_GENERATOR_TOOL = AgentTool(sql_generator_agent)
 
 
@@ -88,6 +98,7 @@ async def generate_sql(
     question: str,
     table: str,
     tool_context: ToolContext,
+    refinement: str | None = None,
 ) -> Dict[str, object]:
     """Call SQLGeneratorAgent and wrap its SQL output as JSON."""
     config = load_config()
@@ -109,15 +120,17 @@ async def generate_sql(
         tool_context.state["last_error"] = "Missing columns for SQL generation."
         return {"success": False, "message": "Missing columns for SQL generation."}
 
-    prompt = (
-        f"User question: {question}\n"
-        f"Target table: {table}\n"
-        "Columns:\n"
-        + "\n".join([f"- {col['name']} ({col.get('type', '')})" for col in columns])
-        + f"\nDatabase type: {db_type}\n"
-        "Dialect rules:\n"
-        f"{dialect_rules}\n"
-    )
+    prompt_parts = [
+        f"User question: {_coerce_text(question).strip()}",
+        f"Refinement: {_coerce_text(refinement).strip()}",
+        f"Target table: {table}",
+        "Columns:",
+        "\n".join([f"- {col['name']} ({col.get('type', '')})" for col in columns]),
+        f"Database type: {db_type}",
+        "Dialect rules:",
+        f"{dialect_rules}",
+    ]
+    prompt = "\n".join(prompt_parts) + "\n"
     try:
         sql_text = await _SQL_GENERATOR_TOOL.run_async(
             args={"request": prompt},
@@ -147,9 +160,36 @@ def run_sql(query: str, tool_context: ToolContext) -> Dict[str, object]:
     try:
         connection = get_mysql_connection()
         cursor = connection.cursor()
-        cursor.execute(sql)
-        rows_data = cursor.fetchall()
-        columns = [desc[0] for desc in cursor.description] if cursor.description else []
+        result_sets = []
+        statements = _split_sql_statements(sql)
+        if not statements:
+            tool_context.state["last_error"] = "Empty SQL after parsing."
+            return {"status": "error", "error_message": "Empty SQL after parsing."}
+        for statement in statements:
+            cursor.execute(statement)
+            with_rows = getattr(cursor, "with_rows", False)
+            if with_rows or cursor.description:
+                rows_data = cursor.fetchall()
+                columns = [desc[0] for desc in cursor.description] if cursor.description else []
+                rows = [list(row) for row in rows_data]
+                result_sets.append(
+                    {
+                        "sql": statement,
+                        "columns": columns,
+                        "rows": rows,
+                        "row_count": len(rows),
+                    }
+                )
+            else:
+                row_count = cursor.rowcount if cursor.rowcount is not None else 0
+                result_sets.append(
+                    {
+                        "sql": statement,
+                        "columns": [],
+                        "rows": [],
+                        "row_count": row_count,
+                    }
+                )
     except Exception as exc:
         tool_context.state["last_error"] = str(exc)
         return {"status": "error", "error_message": "MySQL query failed."}
@@ -157,14 +197,17 @@ def run_sql(query: str, tool_context: ToolContext) -> Dict[str, object]:
         if "cursor" in locals():
             cursor.close()
 
-    rows = [list(row) for row in rows_data]
+    if not result_sets:
+        result_sets = [{"sql": sql, "columns": [], "rows": [], "row_count": 0}]
 
+    primary = result_sets[0]
     payload = {
         "status": "success",
         "sql": sql,
-        "columns": columns,
-        "rows": rows,
-        "row_count": len(rows),
+        "columns": primary.get("columns", []),
+        "rows": primary.get("rows", []),
+        "row_count": primary.get("row_count", 0),
+        "result_sets": result_sets,
     }
     tool_context.state["generated_sql"] = sql
     tool_context.state["sql_result"] = payload
