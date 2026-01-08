@@ -1,3 +1,5 @@
+import os
+
 from google.adk.agents import Agent
 
 from .tools import (
@@ -12,7 +14,7 @@ from .agents.model_provider import get_model
 
 root_agent = Agent(
     name="nl2sql_root",
-    model=get_model(),
+    model=get_model(os.getenv("ROOT_MODEL")),
     description="Orchestrates SQL, plot config, interpretation, and final output.",
     instruction=load_prompt("root_agent"),
     tools=[
