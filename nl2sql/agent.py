@@ -1,13 +1,26 @@
-from google.adk.agents import SequentialAgent
+import os
 
-from .agents.output_agent import output_agent
-from .agents.plot_config_agent import plot_config_agent
-from .agents.result_interpreter_agent import result_interpreter_agent
-from .agents.sql_task_agent import sql_task_agent
+from google.adk.agents import Agent
+
+from .tools import (
+    run_output_tool,
+    run_plot_config_agent_tool,
+    run_result_interpreter_agent_tool,
+    run_sql_task_agent_tool,
+)
+from .utils import load_prompt
+from .agents.model_provider import get_model
 
 
-root_agent = SequentialAgent(
+root_agent = Agent(
     name="nl2sql_root",
-    description="Runs sql_task_agent, plot_config_agent, result_interpreter_agent, and output_agent in order.",
-    sub_agents=[sql_task_agent, plot_config_agent, result_interpreter_agent, output_agent],
+    model=get_model(os.getenv("ROOT_MODEL")),
+    description="Orchestrates SQL, plot config, interpretation, and final output.",
+    instruction=load_prompt("root_agent"),
+    tools=[
+        run_sql_task_agent_tool,
+        run_plot_config_agent_tool,
+        run_result_interpreter_agent_tool,
+        run_output_tool,
+    ],
 )

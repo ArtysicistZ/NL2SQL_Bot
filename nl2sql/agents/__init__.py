@@ -1,5 +1,4 @@
 __all__ = [
-    "output_agent",
     "plot_config_agent",
     "result_interpreter_agent",
     "sql_generator_agent",
