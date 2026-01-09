@@ -2,7 +2,7 @@ import os
 
 from google.adk.agents import Agent
 
-from ..tools.sql_tools import generate_sql, run_sql
+from ..tools.sql import generate_sql, run_sql
 from ..utils import load_prompt
 from .model_provider import get_model
 

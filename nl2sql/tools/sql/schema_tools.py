@@ -4,8 +4,8 @@ from typing import Dict, List
 
 from google.adk.tools.tool_context import ToolContext
 
-from ..config import load_config
-from ..database import get_mysql_connection
+from ...config import load_config
+from ...database import get_mysql_connection
 
 
 def inspect_table_schema(tool_context: ToolContext) -> Dict[str, object]:
