@@ -9,7 +9,7 @@ turns raw rows into a user answer.
 - sql_task_agent: SQL generation -> query execution (schema load is handled by tool wrapper).
 - sql_generator_agent: produces SQL only (no JSON, no markdown).
 - plot_config_agent: generates JSON plot configuration from SQL results.
-- result_interpreter_agent: writes the final answer text to session state.
+- result_interpreter_agent: writes the answer text to session state.
 
 ## Tools
 - inspect_table_schema: queries `information_schema.columns` for all allowed tables.
@@ -21,7 +21,7 @@ turns raw rows into a user answer.
 - run_sql: validates and executes read-only SQL via MySQL.
 - get_sql_result: exposes the latest SQL result to the plot_config_agent.
 - save_plot_config/get_plot_config: persist and read plot_config from state.
-- save_answer/get_answer: persist and read the final answer text from state.
+- save_answer/get_answer: persist and read the answer text from state.
 
 ## Execution Flow
 ```
