@@ -6,11 +6,11 @@
   <img alt="License" src="https://img.shields.io/badge/license-MIT-lightgrey" />
 </p>
 <p align="center">
-  Lightweight NL2SQL service built on Google ADK with Azure OpenAI and MySQL.
+  NL2SQL agent built on Google ADK, LLMs, and RAG.
 </p>
-ADK NL2SQL is a light-weight AI agent that can turn natural language questions into trustworthy data answers through SQL-based RAG architecture.
-It combines LLM‑driven reasoning with controlled SQL execution to deliver
-clear explanations, visualizations, and the exact query used to compute them.
+<p align="center">
+  ADK NL2SQL turns natural language questions into reliable, auditable answers via a SQL-first RAG pipeline. It combines LLM reasoning with controlled SQL execution to deliver clear explanations, visualizations, and the exact query used to compute them.
+</p>
 
 ## Features
 - Ask questions in plain language and get clear, structured answers backed by SQL queries.
