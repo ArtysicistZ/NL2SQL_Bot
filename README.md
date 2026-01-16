@@ -8,8 +8,9 @@
 <p align="center">
   Lightweight NL2SQL service built on Google ADK with Azure OpenAI and MySQL.
 </p>
-It inspects allowed tables, generates read-only SQL, executes it, and returns
-an answer, a plot config, and the SQL query.
+ADK NL2SQL is a light-weight AI agent that can turn natural language questions into trustworthy data answers through SQL-based RAG architecture.
+It combines LLM‑driven reasoning with controlled SQL execution to deliver
+clear explanations, visualizations, and the exact query used to compute them.
 
 ## Features
 - Ask questions in plain language and get clear, structured answers.
@@ -69,9 +70,9 @@ Required:
 - `MYSQL_USER`
 - `MYSQL_PASSWORD`
 - `MYSQL_DATABASE`
+- `ALLOWED_TABLES` (comma-separated allowlist)
 
 Optional:
-- `ALLOWED_TABLES` (comma-separated allowlist)
 - `DB_TYPE` (default: mysql)
 - `DB_SCHEMA` (default: public)
 - `MAX_ROWS` (default: 200)
@@ -86,7 +87,7 @@ Per-agent model overrides (optional):
 Example `.env`:
 ```
 AI_API_KEY=...
-AI_ENDPOINT=https://your-azure-endpoint.openai.azure.com
+AI_ENDPOINT=...
 AI_API_VERSION=2025-01-01-preview
 AI_MODEL=gpt-4o-mini
 
