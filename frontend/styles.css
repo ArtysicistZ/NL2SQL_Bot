@@ -1,0 +1,234 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&display=swap");
+
+:root {
+  --bg: #f7f3ec;
+  --panel-bg: #ffffff;
+  --panel-border: #e3ded4;
+  --text: #1e1f24;
+  --muted: #6a6f7b;
+  --accent: #df6c4f;
+  --accent-dark: #c5553b;
+  --shadow: 0 10px 24px rgba(30, 31, 36, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top left, #fff6e6, transparent 45%),
+    radial-gradient(circle at top right, #f3f6ff, transparent 35%),
+    linear-gradient(180deg, #f8f5f0 0%, #f1ece4 100%);
+  min-height: 100vh;
+}
+
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+}
+
+.app-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.app-title {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.app-subtitle {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.app-main {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: var(--shadow);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.panel-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.question-input {
+  width: 100%;
+  resize: vertical;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fdfbf7;
+}
+
+.input-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.primary-button,
+.secondary-button {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.primary-button {
+  background: var(--accent);
+  color: white;
+}
+
+.primary-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+}
+
+.status-text {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.answer-content {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.plot-container {
+  height: 360px;
+  width: 100%;
+  min-height: 320px;
+  max-height: 420px;
+  display: block;
+}
+
+.plot-panel,
+.sql-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 420px;
+}
+
+.plot-panel .plot-container {
+  flex: 1;
+}
+
+.sql-panel .code-block {
+  flex: 1;
+  margin-top: 0;
+}
+
+.table-container {
+  margin-top: 12px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.data-table th,
+.data-table td {
+  border-bottom: 1px solid var(--panel-border);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.data-table th {
+  background: #f7f4ee;
+  font-weight: 600;
+}
+
+.code-block {
+  margin: 0;
+  background: #f7f4ee;
+  border-radius: 10px;
+  padding: 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  max-width: 100%;
+}
+
+.code-block code {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+  max-width: 100%;
+  display: block;
+}
+
+.code-block .hljs {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  word-break: break-word !important;
+}
+
+@media (max-width: 720px) {
+  .app {
+    padding: 24px 16px 40px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .split-row {
+    grid-template-columns: 1fr;
+  }
+}
+.split-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.split-row > .panel {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}

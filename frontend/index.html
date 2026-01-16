@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NL2SQL UI</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/styles/github.min.css"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div class="app-title">NL2SQL</div>
+        <div class="app-subtitle">Ask a question, see answer, chart, and SQL.</div>
+      </header>
+
+      <main class="app-main">
+        <section class="panel input-panel">
+          <label class="panel-title" for="question">Question</label>
+          <textarea
+            id="question"
+            class="question-input"
+            placeholder="Ask a question about your data..."
+            rows="3"
+          ></textarea>
+          <div class="input-actions">
+            <button id="ask-button" class="primary-button">Run</button>
+            <span id="status" class="status-text"></span>
+          </div>
+        </section>
+
+        <section class="panel answer-panel">
+          <div class="panel-header">
+            <div class="panel-title">Answer</div>
+          </div>
+          <div id="answer" class="answer-content">No answer yet.</div>
+        </section>
+
+        <div class="split-row">
+          <section class="panel plot-panel">
+            <div class="panel-header">
+              <div class="panel-title">Plot</div>
+              <span id="plot-status" class="status-text"></span>
+            </div>
+            <div id="plot" class="plot-container"></div>
+            <div id="table" class="table-container"></div>
+          </section>
+
+          <section class="panel sql-panel">
+            <div class="panel-header">
+              <div class="panel-title">SQL</div>
+              <button id="copy-sql" class="secondary-button">Copy</button>
+            </div>
+            <pre class="code-block"><code id="sql-code" class="language-sql"></code></pre>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.11.1/lib/common.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
