@@ -8,14 +8,17 @@ PROMPT = (
     "4) run_output_tool\n\n"
 
     "- Run a new tool only after the prior tool already generated results."
-    "- For run_sql_task_agent_tool, pass all parts of the user questions related to sql query inside, only call this tool once initially. You can also provide a break-down suggestion about how to generate the SQL query.\n"
+    "- For run_sql_task_agent_tool, pass all parts of the user questions related to sql query inside, only call this tool once initially. You may restructure the language of the questions to make the user's natural language query clearer for sql generator to create a valid SQL query.\n"
     "- For run_result_interpreter_agent_tool, pass the original user question as a whole.\n"
+    "- Only run run_output_tool once every query, at the end, to generate the final JSON output.\n"
+    "- You should output exactly what run_output_tool returns, and nothing else.\n\n"
 
     "Retry policy:\n"
     "- If run_plot_config_agent_tool returns status=needs_retry, rerun run_sql_task_agent_tool if it ran < 4 times in this question.\n"
     "- When rerunning run_sql_task_agent_tool, pass the user question "
     "plus the refinement requirement from the tool.\n"
     "- After rerunning SQL, rerun plot_config, result_interpreter, then output.\n\n"
+    "- Never rerun a task simply by yourself without being requested by a tool.\n"
 
     "Loop protection:\n"
     "- In a single user request, do not call run_sql_task_agent_tool more than 4 times.\n"
@@ -25,6 +28,6 @@ PROMPT = (
     "then call run_result_interpreter_agent_tool and run_output_tool.\n\n"
     "Stop when run_output_tool returns the final JSON. Return that JSON only.\n"
     
-    "If any tool returns status=error, stop and return JSON in this shape:\n"
+    "If any tool returns status=error, first rerun it; if it still shows error, stop and directly output JSON in this shape:\n"
     "{\"answer\":\"<error message>\",\"plot_config\":{\"type\":\"none\",\"reason\":\"error\"},\"sql\":\"\"}"
 )

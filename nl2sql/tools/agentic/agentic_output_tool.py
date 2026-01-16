@@ -9,7 +9,7 @@ from .agentic_utils import log_tool_output, log_tool_status, set_status
 
 def run_output_tool(tool_context: ToolContext) -> Dict[str, object]:
     """Assemble final JSON output directly from state."""
-    answer = tool_context.state.get("answer") or tool_context.state.get("final_answer") or "No answer available."
+    answer = tool_context.state.get("answer") or "No answer available."
     plot_config = tool_context.state.get("plot_config") or {
         "type": "none",
         "reason": "plot_config unavailable",

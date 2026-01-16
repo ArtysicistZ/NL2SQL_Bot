@@ -25,7 +25,6 @@ async def run_result_interpreter_agent_tool(
 ) -> Dict[str, object]:
     """Call result_interpreter_agent with SQL results loaded from state."""
     state_remove(tool_context, "answer")
-    state_remove(tool_context, "final_answer")
     state_remove(tool_context, "answer_status")
     state_remove(tool_context, "sql_retry_request")
 
@@ -65,10 +64,6 @@ async def run_result_interpreter_agent_tool(
         return set_status(tool_context, "answer_status", "error", message)
 
     answer = tool_context.state.get("answer")
-    if not answer:
-        answer = tool_context.state.get("final_answer")
-        if answer:
-            tool_context.state["answer"] = answer
     if not answer:
         message = "Answer not available after agent run."
         tool_context.state["last_error"] = message

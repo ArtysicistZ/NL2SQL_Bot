@@ -85,7 +85,6 @@ def clear_downstream_state(tool_context: ToolContext) -> None:
         "generated_sql",
         "plot_config",
         "answer",
-        "final_answer",
         "final_response",
         "plot_config_status",
         "answer_status",
