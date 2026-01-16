@@ -9,14 +9,15 @@
   Lightweight NL2SQL service built on Google ADK with Azure OpenAI and MySQL.
 </p>
 It inspects allowed tables, generates read-only SQL, executes it, and returns
-both an answer and a plot configuration.
+an answer, a plot config, and the SQL query.
 
 ## Features
-- Read-only SQL enforcement (SELECT only)
-- Table allowlist for schema inspection
-- Multi-statement SQL support (semicolon separated)
-- Agentic workflow: SQL -> plot config -> interpretation -> final JSON
-- Per-agent model overrides (optional)
+- Ask questions in plain language and get clear, structured answers.
+- Visualize results instantly with charts and tables in the built-in UI.
+- See the SQL behind every answer for transparency and trust.
+- Keep data safe with read-only queries and allowlisted tables only.
+- Handle multi-part questions and return all parts in one response.
+- Make analysis repeatable with consistent outputs and visible logic.
 
 ## How It Works
 ```
@@ -41,7 +42,13 @@ pip install -r requirements.txt
 
 2) Create `.env` from `.env.example` and fill values.
 
-3) Run the web UI from the repo root
+3) Run the SPA + API server (serves the frontend at `/`)
+```
+python app/server.py
+```
+Open `http://127.0.0.1:8080` in your browser.
+
+4) Optional: run the ADK webapp for prompt debugging
 ```
 python -m google.adk.cli web .
 ```
@@ -97,7 +104,7 @@ MAX_ROWS=200
 ```
 
 ## Output Format
-The final response is JSON:
+The `/ask` response is JSON:
 ```json
 {
   "answer": "Short natural language answer.",
@@ -113,10 +120,22 @@ The final response is JSON:
 }
 ```
 
+The `/run_sql` response returns row data for charts:
+```json
+{
+  "status": "success",
+  "sql": "SELECT ...",
+  "columns": ["col_a", "col_b"],
+  "rows": [["x", 1], ["y", 2]],
+  "row_count": 2
+}
+```
+
 ## Security
 - SQL execution is read-only (SELECT/SHOW/DESCRIBE/EXPLAIN).
 - Non-read queries are blocked by a simple keyword scan.
 - Optional allowlist limits which tables are inspected.
+- `/run_sql` reuses the same read-only validation as agent execution.
 
 ## Limitations
 - SQL generation currently avoids joins, aliases, and functions.
@@ -125,6 +144,15 @@ The final response is JSON:
 ## Project Structure
 ```
 adk_nl2sql/
+  app/
+    api.py
+    server.py
+    schemas.py
+    settings.py
+  frontend/
+    index.html
+    app.js
+    styles.css
   nl2sql/
     agent.py
     agents/
@@ -139,7 +167,7 @@ adk_nl2sql/
 
 ## Docs
 - `docs/ARCHITECTURE.md`
-- `docs/AGENTIC_TOOLS_PLAN.md`
+- `docs/FRONTEND_PLAN.md`
 
 ## Troubleshooting
 - `mysql` not found: install MySQL and add `mysql.exe` to PATH.

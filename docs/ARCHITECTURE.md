@@ -11,6 +11,16 @@ turns raw rows into a user answer.
 - plot_config_agent: generates JSON plot configuration from SQL results.
 - result_interpreter_agent: writes the answer text to session state.
 
+## App Server
+- `app/server.py`: FastAPI entrypoint serving the SPA and API endpoints.
+- `app/api.py`: `/ask` runs the ADK flow; `/run_sql` executes read-only SQL for charts.
+- The app server uses ADK `InMemoryRunner` to run the root agent with a session.
+
+## Frontend (SPA)
+- `frontend/index.html`: single-page UI shell.
+- `frontend/app.js`: calls `/ask` then `/run_sql`, renders answer, chart, and SQL.
+- `frontend/styles.css`: layout and sizing rules for split plot/SQL panels.
+
 ## Tools
 - inspect_table_schema: queries `information_schema.columns` for all allowed tables.
 - run_sql_task_agent_tool: loads schemas, runs sql_task_agent, stores sql_result + sql_query.
@@ -42,6 +52,16 @@ User -> root_agent
   -> final JSON answer
 ```
 
+## Frontend Flow
+```
+User -> /ask
+  -> ADK runner executes root_agent
+  -> final_response (answer + plot_config + sql)
+Frontend -> /run_sql
+  -> run_sql validates and executes SQL
+  -> sql_result for chart rendering
+```
+
 ## Session State (tool_context.state)
 Keys used by tools and agents:
 - generated_sql
@@ -56,3 +76,4 @@ Keys used by tools and agents:
 ## Security Boundaries
 - Allowed tables only (from ALLOWED_TABLES / TARGET_TABLE) for schema inspection
 - Read-only SQL validation
+- `/run_sql` uses the same read-only validation for frontend chart data
