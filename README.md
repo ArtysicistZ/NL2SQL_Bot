@@ -13,11 +13,10 @@ It combines LLM‑driven reasoning with controlled SQL execution to deliver
 clear explanations, visualizations, and the exact query used to compute them.
 
 ## Features
-- Ask questions in plain language and get clear, structured answers.
-- Visualize results instantly with charts and tables in the built-in UI.
+- Ask questions in plain language and get clear, structured answers backed by SQL queries.
+- Visualize SQL results instantly with charts and tables in the built-in UI.
 - See the SQL behind every answer for transparency and trust.
 - Keep data safe with read-only queries and allowlisted tables only.
-- Handle multi-part questions and return all parts in one response.
 - Make analysis repeatable with consistent outputs and visible logic.
 
 ## How It Works
