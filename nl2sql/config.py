@@ -24,6 +24,8 @@ _load_env()
 
 @dataclass(frozen=True)
 class AppConfig:
+    ai_provider: str
+    openai_api_key: Optional[str]
     ai_api_key: Optional[str]
     ai_endpoint: Optional[str]
     ai_version: str
@@ -64,6 +66,8 @@ def load_config() -> AppConfig:
         mysql_port = 3306
 
     return AppConfig(
+        ai_provider=os.getenv("AI_PROVIDER", "openai").strip().lower(),
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
         ai_api_key=os.getenv("AI_API_KEY"),
         ai_endpoint=os.getenv("AI_ENDPOINT"),
         ai_version=os.getenv("AI_API_VERSION", "2025-01-01-preview"),
@@ -86,6 +90,18 @@ def require_ai_model(config: AppConfig) -> str:
             "Missing AI_MODEL in .env for LiteLLM."
         )
     return config.ai_model
+
+
+def require_ai_api_key(config: AppConfig) -> str:
+    """Return the API key for the active provider, or raise a clear error."""
+    if config.ai_provider == "azure":
+        if not config.ai_api_key:
+            raise ValueError("Missing AI_API_KEY in .env for the azure provider.")
+        return config.ai_api_key
+    # Default provider: standard OpenAI.
+    if not config.openai_api_key:
+        raise ValueError("Missing OPENAI_API_KEY in .env for the openai provider.")
+    return config.openai_api_key
 
 
 def require_mysql_config(config: AppConfig) -> tuple[str, int, str, str, str]:

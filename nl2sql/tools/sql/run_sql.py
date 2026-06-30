@@ -16,6 +16,8 @@ def run_sql(query: str, tool_context: ToolContext) -> Dict[str, object]:
         tool_context.state["last_error"] = "Only read-only SQL queries are allowed."
         return {"status": "error", "error_message": "Only read-only SQL queries are allowed."}
 
+    connection = None
+    cursor = None
     try:
         connection = get_mysql_connection()
         cursor = connection.cursor()
@@ -53,8 +55,10 @@ def run_sql(query: str, tool_context: ToolContext) -> Dict[str, object]:
         tool_context.state["last_error"] = str(exc)
         return {"status": "error", "error_message": "MySQL query failed."}
     finally:
-        if "cursor" in locals():
+        if cursor is not None:
             cursor.close()
+        if connection is not None:
+            connection.close()  # returns the connection to the pool
 
     if not result_sets:
         result_sets = [{"sql": sql, "columns": [], "rows": [], "row_count": 0}]

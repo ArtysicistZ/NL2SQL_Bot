@@ -1,0 +1,59 @@
+# One-command demo: `docker compose up`.
+#   db      MySQL 8, auto-seeded with the Sakila sample database
+#   backend FastAPI + Google ADK agent pipeline (port 8080)
+#   web     Next.js UI (port 3000)  ->  open http://localhost:3000
+#
+# Reads OPENAI_API_KEY and model names from .env (copy .env.example -> .env).
+# To wipe and re-seed the database: `docker compose down -v && docker compose up`.
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-sakila_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sakila}
+    ports:
+      - "3307:3306" # host 3307 to avoid clashing with a local MySQL on 3306
+    volumes:
+      - db-data:/var/lib/mysql
+      # *.sql here run once, only on an empty data volume.
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_PASSWORD:-sakila_root}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s # Sakila import takes a few seconds on first boot
+
+  backend:
+    build: .
+    env_file:
+      - .env
+    environment:
+      # Container-specific overrides (take precedence over .env).
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sakila_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-sakila}
+      HOST: 0.0.0.0
+      SERVE_STATIC: ""
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: ./web
+      args:
+        BACKEND_ORIGIN: http://backend:8080
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+
+volumes:
+  db-data:

@@ -6,6 +6,11 @@ from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.tool_context import ToolContext
 
 from ...agents.plot_config_agent import plot_config_agent
+from ..plot_tools import (
+    _primary_columns_rows,
+    derive_plot_config,
+    is_renderable_plot_config,
+)
 from .agentic_utils import (
     log_tool_input,
     log_tool_output,
@@ -85,12 +90,19 @@ async def run_plot_config_agent_tool(
             refinement=reason,
         )
 
+    # The agent did not request a SQL retry, so we must end with a renderable
+    # config. If it failed to save one, saved an "error", or saved a chart whose
+    # axis fields don't match the result columns, derive a config deterministically
+    # from the result schema (guarantees the chart always renders correctly).
+    columns, _ = _primary_columns_rows(sql_result)
     plot_config = tool_context.state.get("plot_config")
-    if not plot_config:
-        message = "plot_config not available after agent run."
-        tool_context.state["last_error"] = message
-        log_tool_status("run_plot_config_agent_tool", message)
-        return set_status(tool_context, "plot_config_status", "error", message)
+    if not is_renderable_plot_config(plot_config, columns):
+        plot_config = derive_plot_config(sql_result)
+        tool_context.state["plot_config"] = plot_config
+        log_tool_status(
+            "run_plot_config_agent_tool",
+            f"deterministic_default_applied: type={plot_config.get('type')}",
+        )
 
     status_payload = set_status(
         tool_context,

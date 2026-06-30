@@ -1,0 +1,8 @@
+node_modules
+.next
+out
+.env.local
+npm-debug.log*
+smoke.mjs
+smoke.png
+.DS_Store
