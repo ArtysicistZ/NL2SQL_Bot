@@ -87,6 +87,13 @@ async def _run_root_agent(question: str) -> Dict[str, Any]:
     return state
 
 
+@router.get("/health")
+def health() -> Dict[str, str]:
+    """Liveness probe. Intentionally does not touch MySQL so the backend can
+    report healthy before the first query (used by the Docker healthcheck)."""
+    return {"status": "ok"}
+
+
 @router.post("/ask")
 async def ask(request: AskRequest) -> Dict[str, Any]:
     question = request.question.strip()

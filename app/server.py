@@ -24,21 +24,27 @@ def create_app() -> FastAPI:
             allow_headers=["*"],
         )
 
-    if FRONTEND_DIR.exists():
+    # The Next.js app (web/) is the primary UI and is served separately. The
+    # legacy static frontend is only mounted when SERVE_STATIC is enabled, so
+    # the backend image is API-only by default.
+    if _serve_static() and FRONTEND_DIR.exists():
         app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
     return app
+
+
+def _serve_static() -> bool:
+    return os.getenv("SERVE_STATIC", "").lower() in {"1", "true", "yes"}
 
 
 app = create_app()
 
 
 def _print_banner() -> None:
-    index_path = FRONTEND_DIR / "index.html"
-    if index_path.exists():
-        print(f"Serving frontend from {index_path}")
+    if _serve_static() and (FRONTEND_DIR / "index.html").exists():
+        print(f"Serving legacy static frontend from {FRONTEND_DIR / 'index.html'}")
     else:
-        print("Frontend index.html not found; API only.")
+        print("Running API-only (Next.js web/ serves the UI).")
 
 
 if __name__ == "__main__":
@@ -47,7 +53,7 @@ if __name__ == "__main__":
     _print_banner()
     uvicorn.run(
         "app.server:app",
-        host=os.getenv("HOST", "127.0.0.1"),
+        host=os.getenv("HOST", "0.0.0.0"),
         port=int(os.getenv("PORT", "8080")),
         reload=os.getenv("RELOAD", "").lower() in {"1", "true", "yes"},
     )

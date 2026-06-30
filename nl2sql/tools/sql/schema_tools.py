@@ -17,6 +17,8 @@ def inspect_table_schema(tool_context: ToolContext) -> Dict[str, object]:
             "error_message": "Missing allowed tables. Set ALLOWED_TABLES or TARGET_TABLE.",
         }
 
+    connection = None
+    cursor = None
     try:
         connection = get_mysql_connection()
         cursor = connection.cursor()
@@ -44,8 +46,10 @@ def inspect_table_schema(tool_context: ToolContext) -> Dict[str, object]:
             "error_message": f"MySQL query failed: {exc}",
         }
     finally:
-        if "cursor" in locals():
+        if cursor is not None:
             cursor.close()
+        if connection is not None:
+            connection.close()  # returns the connection to the pool
 
     if not table_schemas:
         return {
