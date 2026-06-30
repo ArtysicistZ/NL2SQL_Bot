@@ -11,15 +11,27 @@ turns raw rows into a user answer.
 - plot_config_agent: generates JSON plot configuration from SQL results.
 - result_interpreter_agent: writes the answer text to session state.
 
-## App Server
-- `app/server.py`: FastAPI entrypoint serving the SPA and API endpoints.
-- `app/api.py`: `/ask` runs the ADK flow; `/run_sql` executes read-only SQL for charts.
-- The app server uses ADK `InMemoryRunner` to run the root agent with a session.
+## Model provider
+- `nl2sql/agents/model_provider.py`: builds a cached LiteLLM model per agent.
+- `AI_PROVIDER` selects `openai` (default) or `azure`; only env vars differ between them.
 
-## Frontend (SPA)
-- `frontend/index.html`: single-page UI shell.
-- `frontend/app.js`: calls `/ask` then `/run_sql`, renders answer, chart, and SQL.
-- `frontend/styles.css`: layout and sizing rules for split plot/SQL panels.
+## App Server (API-only)
+- `app/server.py`: FastAPI app factory + uvicorn entrypoint. Binds `0.0.0.0` by default;
+  the legacy static `frontend/` is mounted only when `SERVE_STATIC` is set.
+- `app/api.py`: `/ask` runs the ADK flow; `/run_sql` executes read-only SQL for charts;
+  `/health` is a DB-free liveness probe (used by the Docker healthcheck).
+- The app server uses ADK `InMemoryRunner` to run the root agent with a per-request session.
+
+## Database
+- `nl2sql/database/mysql_client.py`: a `MySQLConnectionPool` (size `MYSQL_POOL_SIZE`).
+  Callers borrow a connection per request and `close()` it to return it to the pool — safe
+  under Starlette's threadpool, where `/run_sql` runs concurrently.
+
+## Frontend (`web/`, Next.js App Router + TypeScript)
+- `web/src/app/page.tsx`: composes the panels (query, answer, chart, results, SQL editor, history).
+- `web/src/hooks/useNl2Sql.ts`: orchestrates `/ask` → `/run_sql`, with request cancellation.
+- `web/src/lib/`: typed API client, plot-config → Plotly translation, CSV export.
+- `web/next.config.mjs`: `rewrites` proxy `/api/*` → `BACKEND_ORIGIN` (same-origin, no CORS).
 
 ## Tools
 - inspect_table_schema: queries `information_schema.columns` for all allowed tables.

@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.venv
+__pycache__/
+*.pyc
+web/
+frontend/
+docker/
+docs/
+*.md
+.claude/
