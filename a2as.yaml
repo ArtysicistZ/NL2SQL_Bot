@@ -1,0 +1,614 @@
+manifest:
+  version: "0.1.3"
+  schema: https://a2as.org/cert/schema
+  subject:
+    name: artysicistz/nl2sql_bot
+    source: https://github.com/artysicistz/nl2sql_bot
+    branch: main
+    commit: "194723e3"
+    scope: [app/api.py, nl2sql/__init__.py, nl2sql/agent.py, nl2sql/agents/__init__.py, nl2sql/agents/model_provider.py, nl2sql/agents/plot_config_agent.py,
+      nl2sql/agents/result_interpreter_agent.py, nl2sql/agents/sql_generator_agent.py, nl2sql/agents/sql_task_agent.py, nl2sql/tools/__init__.py,
+      nl2sql/tools/agentic/__init__.py, nl2sql/tools/agentic/agentic_output_tool.py, nl2sql/tools/agentic/agentic_plot_tool.py,
+      nl2sql/tools/agentic/agentic_result_tool.py, nl2sql/tools/agentic/agentic_sql_tool.py, nl2sql/tools/agentic/agentic_utils.py,
+      nl2sql/tools/sql/__init__.py, nl2sql/tools/sql/generate_sql.py, nl2sql/tools/sql/sql_utils.py, nl2sql/utils/__init__.py]
+  issued:
+    by: A2AS.org
+    at: '2026-02-11T16:47:05Z'
+    url: https://a2as.org/certified/agents/artysicistz/nl2sql_bot
+  signatures:
+    digest: sha256:z3FwgsXxaqiyqnKHNqyy53naCOoVk-42qfaPisC5Cig
+    key: ed25519:R-N4FHnw8D2CguDUoINUOqMbgg45Poi2YIlXkN05er4
+    sig: ed25519:3v9C3_v3XjMRqDdWr3WeW-N_v0XOHH68Zz4wGUHfNhV7LB0i9_yfk8GRqY9jGumF70ZM3bIDLVH1G6F3MAzJAg
+
+agents:
+  plot_config_agent:
+    type: instance
+    models: [get_model]
+    tools: [save_plot_config, request_sql_retry]
+    params:
+      name: plot_config_agent
+      description: Generates JSON plot configuration from SQL queries.
+      instruction:
+        function: load_prompt
+        type: file_load
+        file: plot_config_agent
+  result_interpreter_agent:
+    type: instance
+    models: [get_model]
+    tools: [save_answer]
+    params:
+      name: result_interpreter_agent
+      description: Interprets raw SQL results and answers the user.
+      instruction:
+        function: load_prompt
+        type: file_load
+        file: result_interpreter_agent
+  root_agent:
+    type: instance
+    models: [get_model]
+    tools: [run_sql_task_agent_tool, run_plot_config_agent_tool, run_result_interpreter_agent_tool, run_output_tool]
+    params:
+      name: nl2sql_root
+      description: Orchestrates SQL, plot config, interpretation, and final output.
+      instruction:
+        function: load_prompt
+        type: file_load
+        file: root_agent
+  sql_generator_agent:
+    type: instance
+    models: [get_model]
+    params:
+      name: sql_generator_agent
+      description: Generates read-only SQL for a single target table.
+      instruction:
+        function: load_prompt
+        type: file_load
+        file: sql_generator_agent
+  sql_task_agent:
+    type: instance
+    models: [get_model]
+    tools: [generate_sql, run_sql]
+    params:
+      name: sql_task_agent
+      description: Handles SQL generation and SQL execution.
+      instruction:
+        function: load_prompt
+        type: file_load
+        file: sql_task_agent
+
+models:
+  get_model:
+    type: function
+    agents: [plot_config_agent, root_agent, sql_task_agent, sql_generator_agent, result_interpreter_agent]
+    params:
+      wrapper: get_model
+      arg_0: PLOT_CONFIG_MODEL
+
+tools:
+  _PLOT_CONFIG_TOOL:
+    type: agent
+    params:
+      wrapper: AgentTool
+  _RESULT_INTERPRETER_TOOL:
+    type: agent
+    params:
+      wrapper: AgentTool
+  _SQL_GENERATOR_TOOL:
+    type: agent
+    params:
+      wrapper: AgentTool
+  _SQL_TASK_TOOL:
+    type: agent
+    params:
+      wrapper: AgentTool
+  generate_sql:
+    type: function
+    agents: [sql_task_agent]
+    params:
+      description: Call SQLGeneratorAgent and wrap its SQL output as JSON.
+  request_sql_retry:
+    type: function
+    agents: [plot_config_agent]
+    params:
+      description: Record a request to rerun the SQL tool with a refinement.
+  run_output_tool:
+    type: function
+    agents: [root_agent]
+    params:
+      description: Assemble final JSON output directly from state.
+  run_plot_config_agent_tool:
+    type: function
+    agents: [root_agent]
+    params:
+      description: Call plot_config_agent with SQL query loaded from state.
+  run_result_interpreter_agent_tool:
+    type: function
+    agents: [root_agent]
+    params:
+      description: Call result_interpreter_agent with SQL results loaded from state.
+  run_sql:
+    type: function
+    agents: [sql_task_agent]
+    params:
+      description: Execute SQL after validating it is read-only.
+  run_sql_task_agent_tool:
+    type: function
+    agents: [root_agent]
+    params:
+      description: |-
+        Load schemas, call sql_task_agent, and persist SQL results.
+        This tool is able to handle complex and multiple user requests in one call, never call me twice consequently if user question contains multiple parts about different sql commands.
+  save_answer:
+    type: function
+    agents: [result_interpreter_agent]
+    params:
+      description: Persist the answer text in tool_context.state.
+  save_plot_config:
+    type: function
+    agents: [plot_config_agent]
+    params:
+      description: Persist plot_config JSON in tool_context.state for downstream agents.
+
+imports:
+  _coerce_text: sql_utils._coerce_text
+  _normalize_sql: sql_utils._normalize_sql
+  _split_sql_statements: sql_utils._split_sql_statements
+  Aclosing: google.adk.utils.context_utils.Aclosing
+  Agent: google.adk.agents.Agent
+  AgentTool: google.adk.tools.agent_tool.AgentTool
+  annotations: __future__.annotations
+  Any: typing.Any
+  APIRouter: fastapi.APIRouter
+  AskRequest: schemas.AskRequest
+  clear_downstream_state: agentic_utils.clear_downstream_state
+  connector: mysql.connector
+  CORSMiddleware: fastapi.middleware.cors.CORSMiddleware
+  dataclass: dataclasses.dataclass
+  Dict: typing.Dict
+  Error: mysql.connector.Error
+  FastAPI: fastapi.FastAPI
+  format_sql_result: agentic_utils.format_sql_result
+  format_table_schemas: agentic_utils.format_table_schemas
+  FRONTEND_DIR: settings.FRONTEND_DIR
+  generate_sql: sql.generate_sql
+  get_answer: answer_tools.get_answer
+  get_model: model_provider.get_model
+  get_mysql_connection: mysql_client.get_mysql_connection
+  get_plot_config: plot_tools.get_plot_config
+  get_sql_dialect_rules: utils.sql_dialect.get_sql_dialect_rules
+  get_sql_result: plot_tools.get_sql_result
+  HTTPException: fastapi.HTTPException
+  importlib: importlib
+  InMemoryRunner: google.adk.runners.InMemoryRunner
+  inspect_table_schema: sql.inspect_table_schema
+  json: json
+  List: typing.List
+  LiteLlm: google.adk.models.lite_llm.LiteLlm
+  load_config: config.load_config
+  load_dotenv: dotenv.load_dotenv
+  load_prompt: utils.load_prompt
+  log_tool_input: agentic_utils.log_tool_input
+  log_tool_output: agentic_utils.log_tool_output
+  log_tool_status: agentic_utils.log_tool_status
+  logging: logging
+  normalize_db_type: utils.sql_dialect.normalize_db_type
+  Optional: typing.Optional
+  os: os
+  Path: pathlib.Path
+  plot_config_agent: agents.plot_config_agent.plot_config_agent
+  PLOT_CONFIG_PROMPT: plot_config_agent.PROMPT
+  re: re
+  request_sql_retry: retry_tools.request_sql_retry
+  require_ai_model: config.require_ai_model
+  require_mysql_config: config.require_mysql_config
+  result_interpreter_agent: agents.result_interpreter_agent.result_interpreter_agent
+  RESULT_INTERPRETER_PROMPT: result_interpreter_agent.PROMPT
+  root_agent: nl2sql.agent.root_agent
+  ROOT_AGENT_PROMPT: root_agent.PROMPT
+  router: api.router
+  run_output_tool: agentic.run_output_tool
+  run_plot_config_agent_tool: agentic.run_plot_config_agent_tool
+  run_result_interpreter_agent_tool: agentic.run_result_interpreter_agent_tool
+  run_sql: sql.run_sql
+  run_sql_task_agent_tool: agentic.run_sql_task_agent_tool
+  run_sql_tool: nl2sql.tools.sql.run_sql.run_sql
+  RunSqlRequest: schemas.RunSqlRequest
+  save_answer: answer_tools.save_answer
+  save_plot_config: plot_tools.save_plot_config
+  set_status: agentic_utils.set_status
+  sql_generator_agent: agents.sql_generator_agent.sql_generator_agent
+  SQL_GENERATOR_PROMPT: sql_generator_agent.PROMPT
+  sql_task_agent: agents.sql_task_agent.sql_task_agent
+  SQL_TASK_PROMPT: sql_task_agent.PROMPT
+  sqlparse: sqlparse
+  state_remove: agentic_utils.state_remove
+  state_take: agentic_utils.state_take
+  StaticFiles: fastapi.staticfiles.StaticFiles
+  ToolContext: google.adk.tools.tool_context.ToolContext
+  types: google.genai.types
+  uvicorn: uvicorn
+  validate_sql_is_readonly: sql_utils.validate_sql_is_readonly
+
+functions:
+  __getattr__:
+    type: sync
+    module: nl2sql.agents
+    args: [name]
+  __init__:
+    type: sync
+    module: app.api
+    args: [self]
+    params:
+      returns: None
+  _coerce_text:
+    type: sync
+    module: nl2sql.tools.retry_tools
+    args: [value]
+    params:
+      returns: str
+  _coerce_to_dict:
+    type: sync
+    module: app.api
+    args: [payload]
+    params:
+      returns: Optional[Dict]
+  _format_for_log:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [value]
+    params:
+      returns: str
+  _load_env:
+    type: sync
+    module: nl2sql.config
+    params:
+      returns: None
+  _normalize_final_response:
+    type: sync
+    module: app.api
+    args: [state, response]
+    params:
+      returns: Dict
+  _normalize_sql:
+    type: sync
+    module: nl2sql.tools.sql.sql_utils
+    args: [sql]
+    params:
+      returns: str
+  _parse_plot_config:
+    type: sync
+    module: nl2sql.tools.plot_tools
+    args: [plot_config]
+  _print_banner:
+    type: sync
+    module: app.server
+    params:
+      returns: None
+  _run_root_agent:
+    type: async
+    module: app.api
+    args: [question]
+    params:
+      returns: Dict
+  _split_csv:
+    type: sync
+    module: nl2sql.config
+    args: [value]
+    params:
+      returns: List[str]
+  _split_sql_statements:
+    type: sync
+    module: nl2sql.tools.sql.sql_utils
+    args: [sql]
+    params:
+      returns: list[str]
+  _strip_sql_comments:
+    type: sync
+    module: nl2sql.tools.sql.sql_utils
+    args: [sql]
+    params:
+      returns: str
+  _truncate:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [value, limit]
+    params:
+      returns: str
+  ask:
+    type: async
+    module: app.api
+    args: [request]
+    params:
+      returns: Dict
+  clear_downstream_state:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_context]
+    params:
+      returns: None
+  create_app:
+    type: sync
+    module: app.server
+    params:
+      returns: FastAPI
+  format_sql_result:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [sql_result, max_rows, include_all_rows]
+    params:
+      returns: str
+  format_table_schemas:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [table_schemas]
+    params:
+      returns: str
+  generate_sql:
+    type: async
+    module: nl2sql.tools.sql.generate_sql
+    args: [question, table, tool_context, refinement]
+    params:
+      returns: Dict
+  get_answer:
+    type: sync
+    module: nl2sql.tools.answer_tools
+    args: [tool_context]
+    params:
+      returns: Dict
+  get_model:
+    type: sync
+    module: nl2sql.agents.model_provider
+    args: [deployment]
+    params:
+      returns: LiteLlm
+  get_mysql_connection:
+    type: sync
+    module: nl2sql.database.mysql_client
+    params:
+      returns: mysql.connector.MySQLConnection
+  get_plot_config:
+    type: sync
+    module: nl2sql.tools.plot_tools
+    args: [tool_context]
+    params:
+      returns: Dict
+  get_sql_dialect_rules:
+    type: sync
+    module: nl2sql.utils.sql_dialect
+    args: [db_type]
+    params:
+      returns: str
+  get_sql_result:
+    type: sync
+    module: nl2sql.tools.plot_tools
+    args: [tool_context, max_rows]
+    params:
+      returns: Dict
+  inspect_table_schema:
+    type: sync
+    module: nl2sql.tools.sql.schema_tools
+    args: [tool_context]
+    params:
+      returns: Dict
+  load_config:
+    type: sync
+    module: nl2sql.config
+    params:
+      returns: AppConfig
+  load_prompt:
+    type: sync
+    module: nl2sql.utils.prompt_loader
+    args: [module_name, var_name]
+    params:
+      returns: str
+  log_tool_input:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_name, payload]
+    params:
+      returns: None
+  log_tool_output:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_name, payload]
+    params:
+      returns: None
+  log_tool_status:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_name, message]
+    params:
+      returns: None
+  normalize_db_type:
+    type: sync
+    module: nl2sql.utils.sql_dialect
+    args: [db_type]
+    params:
+      returns: str
+  request_sql_retry:
+    type: sync
+    module: nl2sql.tools.retry_tools
+    args: [reason, tool_context, source]
+    params:
+      returns: Dict
+  require_ai_model:
+    type: sync
+    module: nl2sql.config
+    args: [config]
+    params:
+      returns: str
+  require_mysql_config:
+    type: sync
+    module: nl2sql.config
+    args: [config]
+    params:
+      returns: tuple
+  run_output_tool:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_output_tool
+    args: [tool_context]
+    params:
+      returns: Dict
+  run_plot_config_agent_tool:
+    type: async
+    module: nl2sql.tools.agentic.agentic_plot_tool
+    args: [question, tool_context, refinement]
+    params:
+      returns: Dict
+  run_result_interpreter_agent_tool:
+    type: async
+    module: nl2sql.tools.agentic.agentic_result_tool
+    args: [question, tool_context, refinement]
+    params:
+      returns: Dict
+  run_sql:
+    type: sync
+    module: app.api
+    args: [request]
+    params:
+      returns: Dict
+  run_sql_task_agent_tool:
+    type: async
+    module: nl2sql.tools.agentic.agentic_sql_tool
+    args: [question, tool_context, refinement]
+    params:
+      returns: Dict
+  save_answer:
+    type: sync
+    module: nl2sql.tools.answer_tools
+    args: [answer, tool_context]
+    params:
+      returns: Dict
+  save_plot_config:
+    type: sync
+    module: nl2sql.tools.plot_tools
+    args: [plot_config, tool_context]
+    params:
+      returns: Dict
+  set_status:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_context, key, status, message, refinement]
+    params:
+      returns: Dict
+  state_remove:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_context, key]
+    params:
+      returns: None
+  state_take:
+    type: sync
+    module: nl2sql.tools.agentic.agentic_utils
+    args: [tool_context, key]
+  validate_sql_is_readonly:
+    type: sync
+    module: nl2sql.tools.sql.sql_utils
+    args: [sql]
+    params:
+      returns: bool
+
+variables:
+  AI_API_KEY:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  AI_API_VERSION:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  AI_ENDPOINT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  AI_MODEL:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  ALLOWED_TABLES:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  DB_SCHEMA:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  DB_TYPE:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  ENABLE_CORS:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [app.server]
+  HOST:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [app.server]
+  MAX_ROWS:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  MYSQL_DATABASE:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  MYSQL_HOST:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  MYSQL_PASSWORD:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  MYSQL_PORT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  MYSQL_USER:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+  PORT:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [app.server]
+  RELOAD:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [app.server]
+  TARGET_TABLE:
+    type: env
+    params:
+      caller: [os.getenv]
+      path: [env_path]
+
+files:
+  .env:
+    type: literal
+    actions: [read]
+    params:
+      caller: [_load_env]
+  index.html:
+    type: literal
+    actions: [read]
+    params:
+      caller: [_print_banner]
+      path: [FRONTEND_DIR]
